@@ -35,7 +35,7 @@ buscas = read_csv(here::here("data/search_data.csv"))
 ```
 
 ```{r ETL}
-# Inclui a data a partir do timestamp
+# Convertendo a data
 extracao_dia = buscas %>% 
     select(session_id, results, num_clicks, session_start_date, group, first_click, session_length, search_index) %>%
     mutate(dia = floor_date(session_start_date, unit = "day"))
@@ -53,31 +53,32 @@ agrupamento_por_sessao_clique_dia = extracao_dia %>%
 
 agrupamento_por_sessao_clique_dia
 
+#Result 60040 values
+
 
 sessoes_com_nenhum_clique = agrupamento_por_sessao_clique_dia %>%
     filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
     group_by(group) %>%
     summarise(quantidade_sessoes_sem_clique = n())
+sessoes_com_nenhum_clique
 
+#Result
+#a - 19703
+#b - 6687
 
+# Observação: Para o cálculo da taxa diária de sessões que não obtiveram cliques em seus resultados, será considerada a fração entre a as sessões que obtiveram nenhum de seus resultados clicados pela quantidade total de sessões.
 
-# Para o cálculo da taxa de cliques, primeiramente, será calculada a quantidade total de sessões, que resulta em 67951 sessões.
+# Geral
+zero_geral = sessoes_com_nenhum_clique %>%
+    summarise(sessoes_sem_clique = sum(quantidade_sessoes_sem_clique))
+zero_geral
 
-quantidade_total_sessoes = buscas %>%
-    filter(results > 0, !is.na(num_clicks)) %>%
-    select(session_id) %>%
-    summarise(quantidade_total_sessoes = n_distinct(session_id)) %>%
-    ggplot(aes(x = "" , y = quantidade_total_sessoes)) +
-    geom_col(position = "dodge") +
-   geom_text(aes(x = "", y = quantidade_total_sessoes, label=quantidade_total_sessoes), vjust=1.6, color="white", size=3.5) +
-    labs(
-        title = "Total de Cliques com filtro",
-        y = "Quantidade",
-        x = "Cliques"
-    ) +
-    scale_y_continuous(breaks = seq(from = 0, to = 70000, by = 5000)) 
+#Result 26390
 
-quantidade_total_sessoes
+calculo_zero_geral = zero_geral %>%
+    summarise(total_sessoes_sem_clique = sum(sessoes_sem_clique), taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
+
+calculo_zero_geral
 
 # Geral por grupo
 zero_geral = sessoes_com_nenhum_clique %>%
