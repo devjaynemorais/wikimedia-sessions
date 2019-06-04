@@ -1,0 +1,103 @@
+---
+title: 'L3P5: p-valores x ICs'
+author: "devjaynemorais"
+date: "4 de junho de 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy = FALSE,
+                      fig.width = 6,
+                      fig.height = 5)
+library(tidyverse)
+library(here)
+library(lubridate)
+theme_set(theme_bw())
+
+```
+
+Nessa última parte do lab 3, queremos usar testes de hipótese para um problema de inferência e comparar as conclusões a que chegamos via testes de hipótese e via ICs.
+
+O PROBLEMA
+Considerando que os dados da wikimedia que usamos no Laboratório 2, faça uma inferência sobre como é, na população de todas as sessões do site: 
+
+# 1. A diferença entre o clickthrough rate dos grupos A e B; e
+
+
+
+# 2. A diferença na proporção buscas com zero resultados nos grupos A e B
+
+
+## Carregando Dados
+
+```{r ETL}
+buscas = read_csv(here::here("data/search_data.csv"))
+```
+
+```{r ETL}
+# Inclui a data a partir do timestamp
+extracao_dia = buscas %>% 
+    select(session_id, results, num_clicks, session_start_date, group, first_click, session_length, search_index) %>%
+    mutate(dia = floor_date(session_start_date, unit = "day"))
+
+#Abaixo serão listadas apenas sessões que obtiveram nenhum clique em qualquer uma de suas buscas. Assim como, pesquisas que obtiveram pelo menos 1 resultado retornado, que resulta em 26390 sessões.
+
+# Observação: Abaixo serão listadas apenas sessões que obtiveram nenhum clique em qualquer uma de suas buscas. Assim como, pesquisas que obtiveram pelo menos 1 resultado retornado.
+
+agrupamento_por_sessao_clique_dia = extracao_dia %>%
+    filter(results > 0, !is.na(num_clicks)) %>%
+    select(session_id, results, num_clicks, dia, group) %>%
+    group_by(session_id, dia, group) %>%
+    summarise(cliques_por_sessao = sum(num_clicks),
+              resultados_por_sessao = sum(results))
+
+agrupamento_por_sessao_clique_dia
+
+
+sessoes_com_nenhum_clique = agrupamento_por_sessao_clique_dia %>%
+    filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
+    group_by(group) %>%
+    summarise(quantidade_sessoes_sem_clique = n())
+
+
+
+# Para o cálculo da taxa de cliques, primeiramente, será calculada a quantidade total de sessões, que resulta em 67951 sessões.
+
+quantidade_total_sessoes = buscas %>%
+    filter(results > 0, !is.na(num_clicks)) %>%
+    select(session_id) %>%
+    summarise(quantidade_total_sessoes = n_distinct(session_id)) %>%
+    ggplot(aes(x = "" , y = quantidade_total_sessoes)) +
+    geom_col(position = "dodge") +
+   geom_text(aes(x = "", y = quantidade_total_sessoes, label=quantidade_total_sessoes), vjust=1.6, color="white", size=3.5) +
+    labs(
+        title = "Total de Cliques com filtro",
+        y = "Quantidade",
+        x = "Cliques"
+    ) +
+    scale_y_continuous(breaks = seq(from = 0, to = 70000, by = 5000)) 
+
+quantidade_total_sessoes
+
+# Geral por grupo
+zero_geral = sessoes_com_nenhum_clique %>%
+    group_by(group) %>%
+    summarise(total_sessoes_sem_clique = sum(quantidade_sessoes_sem_clique) ,
+              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) %>%
+    ggplot(aes(x = group , y = taxa_zero, fill = group)) +
+    geom_col(position = "dodge") +
+    geom_text(aes(x = group, y = taxa_zero, label=paste(round(taxa_zero, digits = 2), "%")), vjust=1.6, color="black", size=3.5) +
+    labs(
+        title = "Taxa de nenhum clique por grupo",
+        y = "Taxa de zero cliques (%)",
+        x = "Grupo"
+    ) +
+    scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) 
+
+zero_geral
+
+
+```
+
+
+
