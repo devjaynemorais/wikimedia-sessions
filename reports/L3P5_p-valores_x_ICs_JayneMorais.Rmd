@@ -36,31 +36,37 @@ buscas = read_csv(here::here("data/search_data.csv"))
 
 ```{r ETL}
 # Convertendo a data
-extracao_dia = buscas %>% 
-    select(session_id, results, num_clicks, session_start_date, group, first_click, session_length, search_index) %>%
-    mutate(dia = floor_date(session_start_date, unit = "day"))
-
-#Abaixo serão listadas apenas sessões que obtiveram nenhum clique em qualquer uma de suas buscas. Assim como, pesquisas que obtiveram pelo menos 1 resultado retornado, que resulta em 26390 sessões.
+#extracao_dia = buscas %>% 
+  #  filter(results > 0, !is.na(num_clicks)) %>%
+  #  select(session_id, results, num_clicks, session_start_date, group) %>%
+  #  mutate(dia = floor_date(session_start_date, unit = "day"))
+#extracao_dia
 
 # Observação: Abaixo serão listadas apenas sessões que obtiveram nenhum clique em qualquer uma de suas buscas. Assim como, pesquisas que obtiveram pelo menos 1 resultado retornado.
 
-agrupamento_por_sessao_clique_dia = extracao_dia %>%
-    filter(results > 0, !is.na(num_clicks)) %>%
-    select(session_id, results, num_clicks, dia, group) %>%
-    group_by(session_id, dia, group) %>%
-    summarise(cliques_por_sessao = sum(num_clicks),
-              resultados_por_sessao = sum(results))
+#agrupamento_por_sessao_clique_dia = extracao_dia %>%
+  #  group_by(session_id, dia, group) %>%
+  #  summarise(cliques_por_sessao = sum(num_clicks),
+   #           resultados_por_sessao = sum(results))
 
-agrupamento_por_sessao_clique_dia
+#agrupamento_por_sessao_clique_dia
 
 #Result 60040 values
 
+agrupamento_por_sessao = buscas %>% 
+    filter(results > 0, !is.na(num_clicks)) %>%
+    select(session_id, results, num_clicks, session_start_date, group) %>%
+    group_by(session_id, group) %>%
+    summarise(cliques_por_sessao = sum(num_clicks),
+              resultados_por_sessao = sum(results))
+agrupamento_por_sessao
 
-sessoes_com_nenhum_clique = agrupamento_por_sessao_clique_dia %>%
-    filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
-    group_by(group) %>%
-    summarise(quantidade_sessoes_sem_clique = n())
-sessoes_com_nenhum_clique
+# Quantidade de sessões sem cliques por grupo
+#total_sessoes_com_nenhum_clique = agrupamento_por_sessao_clique_dia %>%
+  #  filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
+   # group_by(group) %>%
+   # summarise(quantidade_sessoes_sem_clique = n())
+#total_sessoes_com_nenhum_clique
 
 #Result
 #a - 19703
@@ -69,40 +75,57 @@ sessoes_com_nenhum_clique
 # Observação: Para o cálculo da taxa diária de sessões que não obtiveram cliques em seus resultados, será considerada a fração entre a as sessões que obtiveram nenhum de seus resultados clicados pela quantidade total de sessões.
 
 # Geral
-zero_geral = sessoes_com_nenhum_clique %>%
-    summarise(sessoes_sem_clique = sum(quantidade_sessoes_sem_clique))
-zero_geral
+#zero_geral = sessoes_com_nenhum_clique %>%
+#    summarise(sessoes_sem_clique = sum(quantidade_sessoes_sem_clique))
+#zero_geral
 
 #Result 26390
-
+# Quantidade Geral de sessões
 quantidade_total_sessoes = buscas %>%
     filter(results > 0, !is.na(num_clicks)) %>%
     select(session_id) %>%
     summarise(quantidade_total_sessoes = n_distinct(session_id)) 
+quantidade_total_sessoes
+#calculo_zero_geral = zero_geral %>%
+ #   summarise(total_sessoes_sem_clique = sum(sessoes_sem_clique), taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
 
-calculo_zero_geral = zero_geral %>%
-    summarise(total_sessoes_sem_clique = sum(sessoes_sem_clique), taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
-
-calculo_zero_geral
+#calculo_zero_geral
 
 # Geral por grupo
-zero_geral = sessoes_com_nenhum_clique %>%
+#zero_geral = total_sessoes_com_nenhum_clique %>%
+#    group_by(group) %>%
+#    summarise(total_sessoes_sem_clique = sum(quantidade_sessoes_sem_clique) ,
+##              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
+
+#zero_geral
+
+taxa_zero_results = agrupamento_por_sessao %>%
+    filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
     group_by(group) %>%
-    summarise(total_sessoes_sem_clique = sum(quantidade_sessoes_sem_clique) ,
-              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) %>%
-    ggplot(aes(x = group , y = taxa_zero, fill = group)) +
-    geom_col(position = "dodge") +
-    geom_text(aes(x = group, y = taxa_zero, label=paste(round(taxa_zero, digits = 2), "%")), vjust=1.6, color="black", size=3.5) +
-    labs(
-        title = "Taxa de nenhum clique por grupo",
-        y = "Taxa de zero cliques (%)",
-        x = "Grupo"
-    ) +
-    scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) 
+    summarise(total_sessoes_sem_clique = n(),
+              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
 
-zero_geral
+taxa_zero_results
+
+```
 
 
+###  A diferença na proporção buscas com zero resultados (zero cliques) nos grupos A e B
+
+```{r}
+theta_diferenca_zero_results = function(d, i){
+    dados = d %>% 
+        slice(i) %>% 
+        group_by(group) 
+    
+    a = dados %>% filter(group == "a") %>% pull(taxa_zero)
+    b = dados %>% filter(group == "b") %>% pull(taxa_zero)
+    
+    a - b
+}
+
+
+theta_diferenca_zero_results(taxa_zero_results, 1:NROW(taxa_zero_results))
 ```
 
 
