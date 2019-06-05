@@ -75,6 +75,11 @@ zero_geral
 
 #Result 26390
 
+quantidade_total_sessoes = buscas %>%
+    filter(results > 0, !is.na(num_clicks)) %>%
+    select(session_id) %>%
+    summarise(quantidade_total_sessoes = n_distinct(session_id)) 
+
 calculo_zero_geral = zero_geral %>%
     summarise(total_sessoes_sem_clique = sum(sessoes_sem_clique), taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
 
