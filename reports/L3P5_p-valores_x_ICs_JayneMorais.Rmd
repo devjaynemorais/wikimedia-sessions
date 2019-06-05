@@ -12,6 +12,8 @@ knitr::opts_chunk$set(tidy = FALSE,
 library(tidyverse)
 library(here)
 library(lubridate)
+library(broom)
+library(boot)
 theme_set(theme_bw())
 
 ```
@@ -35,23 +37,6 @@ buscas = read_csv(here::here("data/search_data.csv"))
 ```
 
 ```{r ETL}
-# Convertendo a data
-#extracao_dia = buscas %>% 
-  #  filter(results > 0, !is.na(num_clicks)) %>%
-  #  select(session_id, results, num_clicks, session_start_date, group) %>%
-  #  mutate(dia = floor_date(session_start_date, unit = "day"))
-#extracao_dia
-
-# Observação: Abaixo serão listadas apenas sessões que obtiveram nenhum clique em qualquer uma de suas buscas. Assim como, pesquisas que obtiveram pelo menos 1 resultado retornado.
-
-#agrupamento_por_sessao_clique_dia = extracao_dia %>%
-  #  group_by(session_id, dia, group) %>%
-  #  summarise(cliques_por_sessao = sum(num_clicks),
-   #           resultados_por_sessao = sum(results))
-
-#agrupamento_por_sessao_clique_dia
-
-#Result 60040 values
 
 agrupamento_por_sessao = buscas %>% 
     filter(results > 0, !is.na(num_clicks)) %>%
@@ -59,51 +44,27 @@ agrupamento_por_sessao = buscas %>%
     group_by(session_id, group) %>%
     summarise(cliques_por_sessao = sum(num_clicks),
               resultados_por_sessao = sum(results))
+
+
+agrupamento_por_sessao = agrupamento_por_sessao %>%
+    filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao))
+
 agrupamento_por_sessao
 
-# Quantidade de sessões sem cliques por grupo
-#total_sessoes_com_nenhum_clique = agrupamento_por_sessao_clique_dia %>%
-  #  filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
-   # group_by(group) %>%
-   # summarise(quantidade_sessoes_sem_clique = n())
-#total_sessoes_com_nenhum_clique
-
-#Result
-#a - 19703
-#b - 6687
-
-# Observação: Para o cálculo da taxa diária de sessões que não obtiveram cliques em seus resultados, será considerada a fração entre a as sessões que obtiveram nenhum de seus resultados clicados pela quantidade total de sessões.
-
-# Geral
-#zero_geral = sessoes_com_nenhum_clique %>%
-#    summarise(sessoes_sem_clique = sum(quantidade_sessoes_sem_clique))
-#zero_geral
-
-#Result 26390
 # Quantidade Geral de sessões
-quantidade_total_sessoes = buscas %>%
+                                                                                                    quantidade_total_sessoes = buscas %>%
     filter(results > 0, !is.na(num_clicks)) %>%
     select(session_id) %>%
     summarise(quantidade_total_sessoes = n_distinct(session_id)) 
 quantidade_total_sessoes
-#calculo_zero_geral = zero_geral %>%
- #   summarise(total_sessoes_sem_clique = sum(sessoes_sem_clique), taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
 
-#calculo_zero_geral
-
-# Geral por grupo
-#zero_geral = total_sessoes_com_nenhum_clique %>%
-#    group_by(group) %>%
-#    summarise(total_sessoes_sem_clique = sum(quantidade_sessoes_sem_clique) ,
-##              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
-
-#zero_geral
+quantidade_total_sessoes = quantidade_total_sessoes$quantidade_total_sessoes
 
 taxa_zero_results = agrupamento_por_sessao %>%
     filter( cliques_por_sessao > 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao)) %>%
     group_by(group) %>%
     summarise(total_sessoes_sem_clique = n(),
-              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes$quantidade_total_sessoes)*100) 
+              taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes)*100) 
 
 taxa_zero_results
 
@@ -113,20 +74,92 @@ taxa_zero_results
 ###  A diferença na proporção buscas com zero resultados (zero cliques) nos grupos A e B
 
 ```{r}
-theta_diferenca_zero_results = function(d, i){
+#theta_diferenca_zero_results <- function(d, i){
+   # dados = d %>% 
+  #      slice(i) %>% 
+  #      group_by(group) 
+    
+  #  a = dados %>% filter(group == "a") %>% pull(taxa_zero)
+  #  b = dados %>% filter(group == "b") %>% pull(taxa_zero)
+    
+   # return(a - b)
+#}
+
+#theta_c = theta_diferenca_zero_results(taxa_zero_results, 1:NROW(taxa_zero_results))
+#theta_c
+
+
+
+theta_diferenca_zero_results <- function(d, i){
     dados = d %>% 
         slice(i) %>% 
-        group_by(group) 
+        group_by(group) %>%
+        summarise(total_sessoes_sem_clique = n(),
+        taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes))
     
     a = dados %>% filter(group == "a") %>% pull(taxa_zero)
     b = dados %>% filter(group == "b") %>% pull(taxa_zero)
     
-    a - b
+    return(a - b)
 }
 
+theta_c = theta_diferenca_zero_results(agrupamento_por_sessao, 1:NROW(agrupamento_por_sessao))
+theta_c
+```
 
-theta_diferenca_zero_results(taxa_zero_results, 1:NROW(taxa_zero_results))
+```{r}
+
+#taxa_zero_results %>% 
+ #   boot(statistic = theta_diferenca_zero_results, R = 4000) %>% 
+   # tidy(conf.level = 0.95, 
+    #     method = "bca",
+       #  conf.int = TRUE)
+
+
+booted <- boot(data = agrupamento_por_sessao, 
+               statistic = theta_diferenca_zero_results, 
+               R = 20)
+
+ci = tidy(booted, 
+          conf.level = .95,
+          conf.method = "bca",
+          conf.int = TRUE)
+
+glimpse(ci)
+```
+```{r}
+ci %>%
+    ggplot(aes(
+        x = "",
+        y = statistic,
+        ymin = conf.low,
+        ymax = conf.high
+    )) +
+    geom_pointrange() +
+    geom_point(size = 3) + 
+    labs(x = "Diferença", 
+         y = "Grupo A - B (Zero Cliques)")
 ```
 
 
+## Com teste de hipótese
+
+
+```{r}
+theta_embaralhado = function(d){
+    dados = d %>% 
+        mutate(grupo_embaralhado = sample(group, n())) %>% 
+    
+        group_by(group) %>%
+        summarise(total_sessoes_sem_clique = n(),
+        taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes))
+    
+    a = dados %>% filter(grupo_embaralhado == "a") %>% pull(taxa_zero)
+    b = dados %>% filter(grupo_embaralhado == "b") %>% pull(taxa_zero)
+    
+    a - b
+}
+
+theta_embaralhado(agrupamento_por_sessao)
+```
 
