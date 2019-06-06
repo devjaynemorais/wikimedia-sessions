@@ -99,7 +99,7 @@ quantidade_total_sessoes_por_grupo %>%
 quantidade_total_sessoes_por_grupo
 
 
-#booted = boot(data = quantidade_total_sessoes_por_grupo, 
+#booted <- boot(data = quantidade_total_sessoes_por_grupo, 
   #             statistic = theta_diferenca_taxa_clickthrough, 
     #           R = 1000)
 
@@ -109,21 +109,22 @@ quantidade_total_sessoes_por_grupo
      #     conf.int = TRUE)
 
 #glimpse(ci)
+
 ```
 
 
 ```{r}
-quantidade_total_sessoes_por_grupo %>%
-    ggplot(aes(
-        x = "",
-        y = statistic,
-        ymin = conf.low,
-        ymax = conf.high
-    )) +
-    geom_pointrange() +
-    geom_point(size = 3) + 
-    labs(x = "Diferença", 
-         y = "Grupo A - B (Zero Cliques)")
+#quantidade_total_sessoes_por_grupo %>%
+   # ggplot(aes(
+   #     x = "",
+   #     y = statistic,
+    #    ymin = conf.low,
+     #   ymax = conf.high
+  #  )) +
+   # geom_pointrange() +
+   # geom_point(size = 3) + 
+   # labs(x = "Diferença", 
+   #      y = "Grupo A - B (Zero Cliques)")
 ```
 
 
@@ -133,15 +134,14 @@ quantidade_total_sessoes_por_grupo %>%
 ```{r}
 theta_embaralhado = function(d){
     dados = d %>% 
-        mutate(grupo_embaralhado = sample(group, n())) %>% 
+        mutate(group = sample(group, n())) %>% 
     
-        group_by(group) %>%
         group_by(group) %>%
         summarise(quantidade_total_sessoes_com_filtro = n_distinct(session_id),
-              taxa_clickthrough = as.numeric((quantidade_total_sessoes_com_filtro/quantidade_total_sessoes) ))
+                  taxa_clickthrough = as.numeric((quantidade_total_sessoes_com_filtro/quantidade_total_sessoes) ))
     
-    a = dados %>% filter(grupo_embaralhado == "a") %>% pull(taxa_zero)
-    b = dados %>% filter(grupo_embaralhado == "b") %>% pull(taxa_zero)
+    a = dados %>% filter(group == "a") %>% pull(taxa_clickthrough)
+    b = dados %>% filter(group == "b") %>% pull(taxa_clickthrough)
     
     a - b
 }
@@ -149,3 +149,27 @@ theta_embaralhado = function(d){
 theta_embaralhado(quantidade_total_sessoes_por_grupo)
 ```
 
+```{r}
+diffs1 = replicate(1000, {theta_embaralhado(quantidade_total_sessoes_por_grupo)})
+
+tibble(diferenca = diffs1) %>% 
+  ggplot(aes(x = diferenca)) + 
+  # geom_histogram(binwidth = .2, fill = "white", color = "darkgreen") + 
+    geom_density(fill = "white", color = "darkgreen") + 
+  geom_vline(xintercept = theta_diferenca_taxa_clickthrough(quantidade_total_sessoes_por_grupo, 1:NROW(quantidade_total_sessoes_por_grupo)), 
+             color = "orange") + 
+    geom_vline(xintercept = - theta_diferenca_taxa_clickthrough(quantidade_total_sessoes_por_grupo, 1:NROW(quantidade_total_sessoes_por_grupo)), 
+             color = "orange") + 
+    geom_rug()
+```
+
+```{r}
+mean(abs(diffs1) >= abs(theta_diferenca_taxa_clickthrough(quantidade_total_sessoes_por_grupo, 1:NROW(quantidade_total_sessoes_por_grupo))))
+```
+
+
+
+```
+    
+    
+    

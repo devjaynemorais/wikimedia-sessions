@@ -1,0 +1,126 @@
+---
+title: "l3p5Parte2"
+author: "devjaynemorais"
+date: "5 de junho de 2019"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy = FALSE,
+                      fig.width = 6,
+                      fig.height = 5)
+library(tidyverse)
+library(here)
+library(lubridate)
+library(broom)
+library(boot)
+theme_set(theme_bw())
+
+```
+
+# 2. A diferença na proporção buscas com zero resultados nos grupos A e B
+```{r ETL}
+buscas = read_csv(here::here("data/search_data.csv"))
+
+
+agrupamento_por_sessao = buscas %>% 
+    filter(results > 0, num_clicks ==0, !is.na(num_clicks)) %>%
+    select(session_id, results, num_clicks, group) #%>%
+    #group_by(session_id) #%>%
+    #summarise(cliques_por_sessao = sum(num_clicks),
+              #resultados_por_sessao = sum(results))
+agrupamento_por_sessao
+
+#agrupamento_por_sessao = agrupamento_por_sessao %>%
+   # filter( cliques_por_sessao == 0, resultados_por_sessao > 0, !is.na(cliques_por_sessao), !is.na(resultados_por_sessao))
+
+#agrupamento_por_sessao
+
+# Quantidade Geral de sessões
+quantidade_total_sessoes = buscas %>%
+    filter(results > 0, !is.na(num_clicks)) %>%
+    select(session_id) %>%
+    summarise(quantidade_total_sessoes = n_distinct(session_id)) 
+
+quantidade_total_sessoes 
+
+
+
+```
+
+```{r}
+theta_diferenca_zero_results <- function(d, i){
+    dados = d %>% 
+        slice(i) %>% 
+        group_by(group) %>%
+        summarise(total_sessoes_sem_resultado = n(),
+        taxa_zero = as.numeric((total_sessoes_sem_resultado/quantidade_total_sessoes)))
+    
+    a = dados %>% filter(group == "a") %>% pull(taxa_zero)
+    b = dados %>% filter(group == "b") %>% pull(taxa_zero)
+    
+    return(a - b)
+}
+#ungroup(agrupamento_por_sessao)
+theta_c = theta_diferenca_zero_results(agrupamento_por_sessao, 1:NROW(agrupamento_por_sessao))
+theta_c
+
+
+```
+
+```{r}
+agrupamento_por_sessao %>% 
+    boot(statistic = theta_diferenca_zero_results, R = 1000) %>% 
+    tidy(conf.level = 0.95, 
+         method = "bca",
+         conf.int = TRUE)
+
+agrupamento_por_sessao
+
+#booted <- boot(data = agrupamento_por_sessao, 
+    #           statistic = theta_diferenca_zero_results, 
+     #          R = 200)
+
+#ci = tidy(booted, 
+      #    conf.level = .95,
+      #    conf.method = "bca",
+      #    conf.int = TRUE)
+
+#glimpse(ci)
+```
+
+
+```{r}
+theta_embaralhado = function(d){
+    dados = d %>% 
+        mutate(group = sample(group, n())) %>% 
+    
+        group_by(group) %>%
+        summarise(total_sessoes_sem_clique = n(),
+        taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes))
+    
+    a = dados %>% filter(group == "a") %>% pull(taxa_zero)
+    b = dados %>% filter(group == "b") %>% pull(taxa_zero)
+    
+    a - b
+}
+
+theta_embaralhado(agrupamento_por_sessao)
+```
+
+```{r}
+diffs1 = replicate(1000, {theta_embaralhado(agrupamento_por_sessao)})
+
+tibble(diferenca = diffs1) %>% 
+  ggplot(aes(x = diferenca)) + 
+  # geom_histogram(binwidth = .2, fill = "white", color = "darkgreen") + 
+    geom_density(fill = "white", color = "darkgreen") + 
+  geom_vline(xintercept = theta_diferenca_zero_results(agrupamento_por_sessao, 1:NROW(agrupamento_por_sessao)), 
+             color = "orange") + 
+    geom_vline(xintercept = - theta_diferenca_zero_results(agrupamento_por_sessao, 1:NROW(agrupamento_por_sessao)), 
+             color = "orange") + 
+    geom_rug()
+```
+
+```{r}
+mean(abs(diffs1) >= abs(theta_diferenca_zero_results(agrupamento_por_sessao, 1:NROW(agrupamento_por_sessao))))
+```
