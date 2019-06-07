@@ -41,7 +41,7 @@ quantidade_total_sessoes
 
 quantidade_total_sessoes_por_grupo = buscas %>%
     filter(results > 0, !is.na(num_clicks)) %>%
-    select(session_id, group) #%>%
+    select(session_id, group, num_clicks) #%>%
     #group_by(session_id) 
     #summarise(quantidade_total_sessoes_com_filtro = n_distinct(session_id),
            #   taxa_clickthrough = as.numeric((quantidade_total_sessoes_com_filtro/quantidade_total_sessoes) ))
@@ -158,6 +158,22 @@ tibble(diferenca = diffs1) %>%
 
 ```{r}
 mean(abs(diffs1) >= abs(theta_diferenca_taxa_clickthrough(quantidade_total_sessoes_por_grupo, 1:NROW(quantidade_total_sessoes_por_grupo))))
+```
+
+
+```{r}
+library(perm)
+quantidade_total_sessoes_por_grupo
+
+taxa_A = quantidade_total_sessoes_por_grupo %>% filter(group == 'a') %>% pull(num_clicks)
+taxa_B = quantidade_total_sessoes_por_grupo %>% filter(group == 'b') %>% pull(num_clicks)
+
+t.test(taxa_A, taxa_B) %>% 
+    tidy() %>% 
+    pull(p.value)
+
+
+permTS(taxa_A, taxa_B)
 ```
 
 

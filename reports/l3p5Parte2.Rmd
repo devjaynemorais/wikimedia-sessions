@@ -100,8 +100,8 @@ theta_embaralhado = function(d){
         mutate(group = sample(group, n())) %>% 
     
         group_by(group) %>%
-        summarise(total_sessoes_sem_clique = n(),
-        taxa_zero = (total_sessoes_sem_clique/quantidade_total_sessoes))
+        summarise(total_sessoes_sem_clique = n_distinct(session_id),
+        taxa_zero = as.numeric((total_sessoes_sem_clique/quantidade_total_sessoes)))
     
     a = dados %>% filter(group == "a") %>% pull(taxa_zero)
     b = dados %>% filter(group == "b") %>% pull(taxa_zero)
@@ -128,4 +128,31 @@ tibble(diferenca = diffs1) %>%
 
 ```{r}
 mean(abs(diffs1) >= abs(theta_diferenca_zero_results(agrupamento_por_sessao, 1:NROW(agrupamento_por_sessao))))
+```
+
+
+```{r}
+
+
+library(perm)
+
+
+taxa_A = agrupamento_por_sessao %>% 
+    filter(group == 'a') %>% 
+    #summarise(total_sessoes_sem_clique = n_distinct(session_id),
+       # taxa_zero = as.numeric((total_sessoes_sem_clique/quantidade_total_sessoes))) %>%
+    pull(num_clicks)
+
+taxa_B = agrupamento_por_sessao %>% 
+    filter(group == 'b') %>% 
+    #summarise(total_sessoes_sem_clique = n_distinct(session_id),
+       # taxa_zero = as.numeric((total_sessoes_sem_clique/quantidade_total_sessoes))) %>%
+    pull(num_clicks)
+
+t.test(taxa_A, taxa_B) %>% 
+    tidy() %>% 
+    pull(p.value)
+
+permTS(taxa_A, taxa_B)
+
 ```
