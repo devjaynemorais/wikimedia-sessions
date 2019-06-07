@@ -42,32 +42,24 @@ quantidade_total_sessoes
 quantidade_total_sessoes_por_grupo = buscas %>%
     filter(results > 0, !is.na(num_clicks)) %>%
     select(session_id, group) #%>%
-    #group_by(group) %>%
+    #group_by(session_id) 
     #summarise(quantidade_total_sessoes_com_filtro = n_distinct(session_id),
            #   taxa_clickthrough = as.numeric((quantidade_total_sessoes_com_filtro/quantidade_total_sessoes) ))
 quantidade_total_sessoes_por_grupo
 
 
+proporcao = quantidade_total_sessoes_por_grupo %>% 
+    group_by(group) %>%
+    summarise(quantidade_total_sessoes_com_filtro = n_distinct(session_id),
+              taxa_clickthrough = as.numeric((quantidade_total_sessoes_com_filtro/quantidade_total_sessoes) ),
+              desvio_padrao = sd(quantidade_total_sessoes_com_filtro))
+proporcao
+
 
 ```
 
 
-###  A diferença na proporção buscas com zero resultados (zero cliques) nos grupos A e B
-
 ```{r}
-#theta_diferenca_zero_results <- function(d, i){
-   # dados = d %>% 
-  #      slice(i) %>% 
-  #      group_by(group) 
-    
-  #  a = dados %>% filter(group == "a") %>% pull(taxa_zero)
-  #  b = dados %>% filter(group == "b") %>% pull(taxa_zero)
-    
-   # return(a - b)
-#}
-
-#theta_c = theta_diferenca_zero_results(taxa_zero_results, 1:NROW(taxa_zero_results))
-#theta_c
 
 
 
@@ -75,12 +67,13 @@ theta_diferenca_taxa_clickthrough <- function(d, i){
     dados = d %>% 
     slice(i) %>% 
     group_by(group) %>%
-    summarise(quantidade_total_sessoes_com_filtro = n_distinct(session_id),
+    summarise(quantidade_total_sessoes_com_filtro = n(),
               taxa_clickthrough = as.numeric((quantidade_total_sessoes_com_filtro/quantidade_total_sessoes) ))
     
     a = dados %>% filter(group == "a") %>% pull(taxa_clickthrough)
+
     b = dados %>% filter(group == "b") %>% pull(taxa_clickthrough)
-    
+
     return(a - b)
 }
 

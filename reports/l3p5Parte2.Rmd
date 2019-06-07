@@ -37,11 +37,16 @@ agrupamento_por_sessao
 
 # Quantidade Geral de sessões
 quantidade_total_sessoes = buscas %>%
-    filter(results > 0, !is.na(num_clicks)) %>%
+    filter(results > 0,  num_clicks ==0, !is.na(num_clicks)) %>%
     select(session_id) %>%
     summarise(quantidade_total_sessoes = n_distinct(session_id)) 
+quantidade_total_sessoes
 
-quantidade_total_sessoes 
+proporcao = agrupamento_por_sessao %>% 
+    group_by(group) %>%
+        summarise(total_sessoes_sem_resultado = n_distinct(session_id),
+        taxa_zero = as.numeric((total_sessoes_sem_resultado/quantidade_total_sessoes)))
+proporcao
 
 
 
